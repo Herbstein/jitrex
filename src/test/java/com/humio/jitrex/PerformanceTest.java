@@ -1,6 +1,7 @@
 package com.humio.jitrex;
 
 import com.humio.jitrex.util.Regex;
+import io.questdb.jar.jni.JarJniLoader;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -45,6 +46,25 @@ public class PerformanceTest {
             return result;
         }
 
+    }
+
+    private static class RustRegexBackend extends RegexpBackend {
+        private static native int internalCountMatches(String pattern, String[] inputs);
+
+        static {
+            JarJniLoader.loadLib(RustRegexBackend.class,"/com/humio/jitrex/", "rust_regex");
+        }
+
+        private final String pattern;
+
+        public RustRegexBackend(String pattern) {
+            this.pattern = pattern;
+        }
+
+        @Override
+        public int countMatches(List<String> inputs) {
+            return internalCountMatches(pattern, inputs.toArray(new String[0]));
+        }
     }
 
     private static class JavaBackend extends RegexpBackend {
@@ -98,15 +118,16 @@ public class PerformanceTest {
     }
 
     private static final Map<String, RegexpBackendFactory> backendFactories = new HashMap<String, RegexpBackendFactory>() {{
-        put("jitrex", (pattern)->new JitrexBackend(pattern, Regex._OLD_LONG_STRING_HANDLING));
-        put("jitrex/i", (pattern)->new JitrexBackend(pattern, Regex.CASE_INSENSITIVE | Regex._OLD_LONG_STRING_HANDLING));
-        put("jitrex/n", (pattern)->new JitrexBackend(pattern, 0));
-        put("jitrex/ni", (pattern)->new JitrexBackend(pattern, Regex.CASE_INSENSITIVE));
+        put("jitrex", (pattern) -> new JitrexBackend(pattern, Regex._OLD_LONG_STRING_HANDLING));
+        put("jitrex/i", (pattern) -> new JitrexBackend(pattern, Regex.CASE_INSENSITIVE | Regex._OLD_LONG_STRING_HANDLING));
+        put("jitrex/n", (pattern) -> new JitrexBackend(pattern, 0));
+        put("jitrex/ni", (pattern) -> new JitrexBackend(pattern, Regex.CASE_INSENSITIVE));
         put("java", JavaBackend::new);
         put("re2", Re2Backend::new);
+        put("rust", RustRegexBackend::new);
     }};
 
-    static String [] regexes = {
+    static String[] regexes = {
             "Twain",
             "(?i)Twain",
             "[a-z]shing",
@@ -138,18 +159,19 @@ public class PerformanceTest {
     }
 
     private static String[] init() throws IOException {
-        InputStream in = PerformanceTest.class.getResourceAsStream( "3200.txt" );
-        BufferedReader br = new BufferedReader( new InputStreamReader(in, StandardCharsets.UTF_8 ));
+        InputStream in = PerformanceTest.class.getResourceAsStream("3200.txt");
+        BufferedReader br = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
         List<String> out = new ArrayList<>();
         String line;
         while ((line = br.readLine()) != null) {
             out.add(line);
         }
-        return out.toArray(new String[out.size()]);
+        return out.toArray(new String[0]);
     }
 
     private static void runBenchmark(List<String> backendNames, String keyBackend, List<String> patterns, List<String> inputs,
-                              int repeatCount) {
+                                     int repeatCount) {
+        PrintStream err = System.err;
         PrintStream out = System.out;
         int keyIndex = backendNames.indexOf(keyBackend);
         List<RegexpBackendFactory> factories = backendNames.stream().map(backendFactories::get).collect(Collectors.toList());
@@ -217,7 +239,7 @@ public class PerformanceTest {
                 "jitrex",
                 Arrays.asList(regexes),
                 Arrays.asList(input),
-                3);
+                1);
     }
 
     public static void main(String[] args) {
