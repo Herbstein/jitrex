@@ -236,7 +236,7 @@ public class PerformanceTest {
     public void testIt() {
         runBenchmark(
                 allBackendNames(),
-                "jitrex",
+                "rust",
                 Arrays.asList(regexes),
                 Arrays.asList(input),
                 1);

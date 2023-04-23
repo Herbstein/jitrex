@@ -26,8 +26,6 @@ pub extern "system" fn Java_com_humio_jitrex_PerformanceTest_00024RustRegexBacke
 
     let mut matches = 0;
 
-    let mut extracted = Vec::with_capacity(inputs_length as usize);
-
     for i in 0..inputs_length {
         let input = env
             .get_object_array_element(&inputs, i)
@@ -39,14 +37,10 @@ pub extern "system" fn Java_com_humio_jitrex_PerformanceTest_00024RustRegexBacke
                 .into()
         };
 
-        extracted.push(input);
-
-        //if regex.is_match(&input) {
-        //    matches += 1;
-        //}
+        if regex.is_match(&input) {
+            matches += 1;
+        }
     }
 
-    let joined = extracted.join("\n");
-
-    regex.find_iter(&joined).count() as i32
+    matches
 }
